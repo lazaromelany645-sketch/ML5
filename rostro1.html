@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.js"></script>
+    <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+  </head>
+  <body>
+
+    <script>
+      //Objetos
+      let faceMesh      //Modelo
+      let video         //Cámara
+      let faces = []    //Rostros
+      let options = {
+        maxFaces: 1,
+        refineLandmarks: false,
+        flipped: false
+      }
+
+      let uvMapImage
+      let triangulation
+      let uvCoords
+
+      async function setup(){
+        faceMesh = await ml5.faceMesh(options)  //Modelo
+        uvMapImage = await loadImage("./images/metal.png")
+
+        createCanvas(640, 480, WEBGL)
+
+        video = createCapture(VIDEO)
+        video.size(640, 480)
+        video.hide()
+
+        //Iniciar la detección
+        faceMesh.detectStart(video, gotFaces)
+        
+        //Identificación del mapa de coordenadas
+        triangulation = faceMesh.getTriangles() //Zona / sección del rostro
+        uvCoords = faceMesh.getUVCoords()
+      }
+
+      function draw(){
+        //Invertir la imagen
+        translate(-width/2, -height/2)
+        //background(50)
+        image(video, 0, 0,width, height)
+
+        //Iterar los rostros
+        for (let i = 0; i < faces.length; i++){
+          let face = faces[i]
+
+          //Configuración del render
+          noStroke()
+          texture(uvMapImage) //mascara.png
+          textureMode(NORMAL)
+          beginShape(TRIANGLES)
+
+          //Ubicación de cada punto del rostro
+          for (let i = 0; i < triangulation.length; i++){
+            let indexA = triangulation[i][0]
+            let indexB = triangulation[i][1]
+            let indexC = triangulation[i][2]
+
+            let a = face.keypoints[indexA]
+            let b = face.keypoints[indexB]
+            let c = face.keypoints[indexC]
+
+            let uvA = { x: uvCoords[indexA][0], y: uvCoords[indexA][1] }
+            let uvB = { x: uvCoords[indexB][0], y: uvCoords[indexB][1] }
+            let uvC = { x: uvCoords[indexC][0], y: uvCoords[indexC][1] }
+
+            vertex(a.x, a.y, uvA.x, uvA.y)
+            vertex(b.x, b.y, uvB.x, uvB.y)
+            vertex(c.x, c.y, uvC.x, uvC.y)
+          }
+
+          endShape()
+        }
+      }
+
+      function gotFaces(results){
+        faces = results
+      }
+
+    </script>
+
+  </body>
+</html>

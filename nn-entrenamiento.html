@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+
+<!-- CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+
+  <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+
+  <script>
+    //Paso 1: arreglo para cada grupo de imágenes
+    let circles = []
+    let squares = []
+    let triangles = []
+    let shapeClassifier      //ML5
+
+    //Paso 2: Carga de las imágenes
+    function preload(){
+      for(let i = 0; i < 100; i++){
+
+        //nf (new format)
+        //nf (número, enteros, decimales)
+        //nf ((0+1), 3, 0) -> 001
+        //nf ((9+1), 3, 0) -> 010
+        let index = nf((i+1), 3, 0)
+
+        circles[i] = loadImage(`data/circle${index}.png`)
+        squares[i] = loadImage(`data/square${index}.png`)
+        triangles[i] = loadImage(`data/triangle${index}.png`)
+      }
+    }
+
+    function setup(){
+      let options = {
+        inputs:[64, 64, 4],
+        task: "imageClassification",
+        debug:true
+      }
+
+      //Inicializamos la red neuronal
+      shapeClassifier = ml5.neuralNetwork(options)
+
+      //Datos de entrenamiento
+      for (let i = 0; i < 100; i++){
+        //Agregar: Círculos
+        shapeClassifier.addData({image: circles[i]}, {label: 'Circulo'})
+
+        //Agregar: Cuadrados
+        shapeClassifier.addData({image: squares[i]}, {label: 'Cuadrado'})
+
+        //Agregar: Triángulos
+        shapeClassifier.addData({image: triangles[i]}, {label: 'Triangulo'})
+      }
+
+      //Normalizacion
+      shapeClassifier.normalizeData()
+
+      shapeClassifier.train({epochs: 50}, finishedTraining)
+    }
+
+    
+
+    //cuando finalice el entrenamineto, guardamos: 2(JSON), 1(BIN)
+    function finishedTraining(){
+      console.log("Entrenamiento finalizado")
+      shapeClassifier.save() // se descargan 3 achivos 
+    }
+  </script>
+
+</body>
+</html>

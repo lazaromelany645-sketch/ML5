@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+<!-- <h2>Neural Network</h2> -->
+<!-- <p>Identifica el color predominante - RGB</p> -->
+
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+
+  <script>
+    //Entrenar - datos 
+    let data = [
+      { r: 255, g: 0, b: 0, color: "rojo" },
+      { r: 254, g: 0, b: 0, color: "rojo" },
+      { r: 253, g: 0, b: 0, color: "rojo" },
+      { r: 0, g: 255, b: 0, color: "verde" },
+      { r: 0, g: 254, b: 0, color: "verde" },
+      { r: 0, g: 253, b: 0, color: "verde" },
+      { r: 0, g: 0, b: 255, color: "azul" },
+      { r: 0, g: 0, b: 254, color: "azul" },
+      { r: 0, g: 0, b: 253, color: "azul" }
+    ]
+    
+    //Objetos 
+    let classifier          //ML5
+    let r = 225
+    let g = 0
+    let b = 0
+
+    let rSlider, gSlider, bSlider
+    let label = 'Entrenando.....'
+    
+    //Configuración
+    function setup(){
+      createCanvas(640, 240)
+      ml5.setBackend("webgl") //Motor gráfico
+
+      //Crear slider
+      //createSlider(min, max, value)
+      //position es el lugar dentro del canvas
+      rSlider = createSlider(0, 255, 255).position(10, 20)
+      gSlider = createSlider(0, 255, 0).position(10, 40)
+      bSlider = createSlider(0, 255, 0).position(10, 60)
+
+      //Asignar red neuronal 
+      //debug = true (permite ver el entrenamiento)
+      let option = {
+        task: "classification",
+        debug: true
+      }
+
+      //Iniciar la red neuronal 
+      classifier = ml5.neuralNetwork(options)
+
+      //Facilitarle los datos para que entrene 
+      for (let i = 0; i < data.length; i++){
+        let item = data[i]
+        let inputs = [item.r, item.g, item.b]
+        let outputs = [item.color]
+
+        //Red Neuronal=> DATOS ENTRENADOS  - RESULTADOS 
+        classifier.addData(inputs, outputs)
+      }
+
+      //Normalización (verificacion )
+      classifier.normalizeData()
+
+      //Entrenamiento
+      let trainingOptions = {
+        epochs: 32,
+        batchSize: 12
+      }
+      classifier.train(trainingOptions, finishedTraining)
+    }
+
+    //
+    function finishedTraining(){
+      classify()
+    }
+
+    //Clasificación - identificación
+    function classify(){
+      let input = [r, g, b] //array
+      classifier.classify(input, handResults)
+    }
+
+    //Render en el lienzo
+    function draw(){
+      //Recibir los valores de los slider
+      r = rSlider.value
+      g = gSlider.value
+      b = bSlider.value
+
+      background(r, g, b) //Lienzo se configura de acuerdo slider
+      textAlign(CENTER, CENTER)
+      textSize(64)
+      text(label, width/2, height/2)
+    }
+
+    //Gestión del resultado o error
+    function handResults(results, error){
+      if (error){
+        console.error(error)
+        return;
+      }
+
+      label = results[0].label
+      classify()
+    }
+  </script>
+
+</body>
+</html>

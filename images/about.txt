@@ -1,0 +1,5 @@
+Las imágenes deben ser medianas (480 -> 1080)
+Utilizar jpg
+Imagen del personaje (animal) no esté cortado
+Puede tener o no un fondo plano
+El nombre de los archivos no tiene que representar a la imagen

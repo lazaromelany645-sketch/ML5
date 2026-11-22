@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script src="https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.js"></script>
+    <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+
+    <script>
+      let data = [
+        { x: 0.99, y: 0.02, label: "derecha" },
+        { x: 0.76, y: -0.1, label: "derecha" },
+        { x: -1.0, y: 0.12, label: "izquierda" },
+        { x: -0.9, y: -0.1, label: "izquierda" },
+        { x: 0.02, y: 0.98, label: "abajo" },
+        { x: -0.2, y: 0.75, label: "abajo" },
+        { x: 0.01, y: -0.9, label: "arriba" },
+        { x: -0.1, y: -0.8, label: "arriba" },
+      ];
+
+      let classifier    //ML5 (RED NEURONAL)
+      let label = "Entrenando....."
+      let start, end
+
+      function setup(){
+        createCanvas(640, 240)
+        ml5.setBackend("webgl")
+
+        //Configurar red neuronal
+        let options = {
+          task: "classification",
+          debug: true
+        }
+
+        classifier = ml5.neuralNetwork(options)
+
+        //Entregar datos de entrenamiento
+        for (let i = 0; i < data.length; i++){
+          let item = data[i]
+          let inputs = [item.x, item.y]
+          let outputs = [item.label]
+          classifier.addData(inputs, outputs)
+        }
+        classifier.normalizeData()
+        classifier.train({ epochs: 100 }, finishedTraining)
+      }
+
+      function finishedTraining(){
+        label  = "listo"
+      }
+
+      function draw(){
+        background(200)
+        textAlign(CENTER, CENTER)
+        textSize(64)
+        text(label, width/2, height/2)
+
+        //La detección y análisis por parte de la red neuronal se realizará
+        //cuando se termine un vector. Las variables ≠ undefined
+        if (start && end){
+          strokeWeight(8) //Grosor
+          line(start.x, start.y, end.x, end.y)
+        }
+      }
+
+      //Pulsar
+      function mousePressed(){
+        start = createVector(mouseX, mouseY)
+        end = createVector(mouseX, mouseY)
+      }
+
+      //Arrastrar
+      function mouseDragged(){
+        end = createVector(mouseX, mouseY)
+      }
+
+      //Liberar = TERMINASTE DE CREAR VECTOR (LINEA)
+      //El modelo deberá evaluar la dirección
+
+      //Liberar
+      function mouseReleased(){
+        let dir = p5.Vector.sub(end, start)
+        dir.normalize()
+
+        let inputs = [dir.x, dir.y]
+        classifier.classify(inputs, gotResults)
+       }
+
+      function gotResults(results){
+        label = results[0].label
+      }
+
+      
+    </script>
+  </body>
+</html>

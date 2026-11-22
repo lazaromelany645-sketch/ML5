@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Identificando mano</title>
+  </head>
+  <body>
+
+    <!-- Multimedia = texto, sonido, cámara, lienzo, imágenes, micrófono -->
+    <script src="https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.js"></script>
+    <!-- Brinda acceso al modelo > API REST -->
+    <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+
+    <script>
+      //Paso 1 (objetos y variables)
+      let handPose      //Acceder modelo ML5
+      let video         //Accede a la cámara
+      let hands = []    //Arreglo que contiene la información de las manos
+      let connections   //Conexiones de la mano
+
+      //Paso 2 - Configuración
+      async function setup(){
+        handPose = await ml5.handPose() //Modelo
+
+        createCanvas(640, 480) //Renderiza video + conexiones
+
+        //HTTP => getUserMedia is not implemented in this browser ¡CUIDADO!
+        //Input cámara Web
+        video = createCapture(VIDEO) //Leer la información cámara[0]
+        video.size(640, 480)
+        video.hide() //Ocultamos el vídeo porque será renderizado en canvas
+
+        //Iniciar la detección
+        handPose.detectStart(video, gotHands)
+        connections = handPose.getConnections()
+      }
+
+      //Paso 3 - Renderizado (dibujar)
+      function draw(){
+        //Pintar el vídeo obtenido en el canvas
+        image(video, 0, 0,width, height)
+
+        //Identifica la(s) mano(s) y luego analiza sus CONEXIONES
+        for (let i = 0; i < hands.length; i++){
+          let hand = hands[i]
+          //Recorrer el arreglo que contiene todas las conexiones de UNA MANO
+          for (let j = 0; j < connections.length; j++){
+            let pointAIndex = connections[j][0] //x
+            let pointBIndex = connections[j][1] //y
+            let pointA = hand.keypoints[pointAIndex]
+            let pointB = hand.keypoints[pointBIndex]
+
+            //Configuración del render
+            stroke(255,0,0)
+            strokeWeight(2)
+            line(pointA.x, pointA.y, pointB.x, pointB.y)
+          }
+        }
+
+        //Renderizar los PUNTOS
+        for (let i = 0; i < hands.length; i++){
+          let hand = hands[i]
+          for (let j = 0; j < hand.keypoints.length; j++){
+            let keypoint = hand.keypoints[j] //Contiene X - Y
+            fill(0, 255, 0) //Color de relleno (verde)
+            noStroke()
+            circle(keypoint.x, keypoint.y, 10) //Ejex, ejey, radio
+          }
+        }
+      }
+
+      //Paso 4 - gotHands (resultado)
+      function gotHands(results){
+        //El resultado obtenido por el modelo, serán las manos
+        hands = results
+      }
+
+    </script>
+  </body>
+</html>

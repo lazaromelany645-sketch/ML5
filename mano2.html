@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+
+  <!-- CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+
+</head>
+<body>
+  
+  <div id="resultados"></div>
+
+  <script>
+
+    const resultados = document.querySelector("#resultados")
+
+    //Objetos
+    let handPose    //Modelo ML5
+    let video       //Cámara
+    let hands = []  //Manos (0, 1, 2)
+    let distancia   //Distancia
+
+    //Configuración
+    async function setup(){
+      handPose = await ml5.handPose()
+
+      /* LQ > HQ > HD > FHD > 2K > 4K > 8K */
+      createCanvas(640, 480) //HQ (Alta Calidad)
+
+      //Detección del vídeo (cámara)
+      video = createCapture(VIDEO)
+      video.size(640, 480)
+      video.hide()
+
+      //(fuenteVideo, callback function)
+      handPose.detectStart(video, gotHands)
+    } 
+    
+    //Render
+    function draw(){
+      image(video, 0, 0, width, height)
+
+      //El renderizado se realiza cuando tiene una mano detectada
+      //hands contiene la información de cada dedo y su ubicación en 2D y 3D
+      if (hands.length > 0){
+        //Index finger (dedo índice)
+        let finger = hands[0].index_finger_tip
+        //Pulgar
+        let thumb = hands[0].thumb_tip
+
+        //resultados.innerHTML = `[Eje X] = Índice: ${finger.x} - Pulgar: ${thumb.x}`
+
+        //Dibujar un círculo entre los dedos (índice, pulgar)
+        let centerX = (finger.x + thumb.x) / 2
+        let centerY = (finger.y + thumb.y) / 2
+        distancia = dist(finger.x, finger.y, thumb.x, thumb.y)
+
+        //Pintar el círculo
+        //R - G - B - Alpha
+        //Alpha (0 transparente - 255 sólido)
+        fill(0, 255, 0, 200)
+        stroke(0)
+        strokeWeight(2)
+        circle(centerX, centerY, distancia)
+      }
+    }
+
+    //Resultados
+    function gotHands(results){
+      hands = results
+    }
+
+  </script>
+</body>
+</html>

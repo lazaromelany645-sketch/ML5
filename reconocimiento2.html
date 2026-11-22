@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reconocimiento a mano</title>
+    <link rel="stylesheet" href="./styles/styles.css" />
+  </head>
+  <body style="background-color: antiquewhite;">
+    <div class="contenedor">
+      <h2>Reconocimiento de imágenes - "Quick Draw"</h2>
+      <h4>Utilizando un modelo ya entrenado</h4>
+      <hr />
+      <div id="ml5-result"><!-- Renderizar el canvas --></div>
+    </div>
+
+    <!-- P5 librería para gestión multimedia con JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.10.0/p5.js"></script>
+
+    <!-- ML5 modelo derivado de TensorFlow -->
+    <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+
+    <script>
+      let classifier   //ML5
+      let clearButton  //Reiniciar canvas
+      let resultsP     //Espacio mostrar resultados
+      let lienzo       //Lienzo donde dibujamos
+
+      //Resultados
+      let label
+      let confidence
+
+      //Cargar el modelo
+      function preload() {
+        classifier = ml5.imageClassifier("DoodleNet")
+      }
+
+      //Configuración
+      function setup() {
+        //Mientras más grande el lienzo, más complejo será el análisis
+        lienzo = createCanvas(280, 280) //Tamaño lienzo
+        lienzo.parent('ml5-result')
+        background(255) //Color lienzo
+        classifier.classifyStart(lienzo, gotResult)
+
+        //Mostrar resultado en la UI
+        resultsP = createP("label") //Crea un <p>
+        clearButton = createButton("Limpiar") //Crea un <button>
+        clearButton.mousePressed(clearCanvas)
+
+        resultsP.parent('ml5-result')
+        clearButton.parent('ml5-result')
+      }
+
+      //Reinicia el lienzo
+      function clearCanvas() {
+        background(255)
+      }
+
+      //Dibujar a mano alzada en el lienzo
+      function draw() {
+        //Especificar grosor línea
+        strokeWeight(16)
+        stroke(0)
+        if (mouseIsPressed) {
+          //p = pressed
+          line(pmouseX, pmouseY, mouseX, mouseY)
+        }
+      }
+
+      function gotResult(results) {
+        let label = results[0].label
+        let confidence = results[0].confidence
+        resultsP.html(`${label} ${nf(confidence, 0, 2)}`)
+      }
+    </script>
+  </body>
+</html>
