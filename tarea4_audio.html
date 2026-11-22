@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detector de útiles entrenable</title>
+  <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; font-family: system-ui, sans-serif; background: #fff; color: #111; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 420px) minmax(200px, 300px);
+      gap: 48px;
+      justify-content: center;
+      align-items: start;
+    }
+    .col { display: flex; flex-direction: column; gap: 14px; }
+    .panel { border: 1.5px solid #111; padding: 8px 10px; background: #fff; }
+    .panel h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+    #camara { border-color: #2e7d32; padding: 8px; }
+    canvas { width: 100%; display: block; background: #000; }
+
+    .slot {
+      --color: #2e7d32;
+      border: 1.5px solid var(--color);
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      transition: background .25s, color .25s;
+    }
+    .slot .info { margin-left: auto; color: #555; font-size: 13px; }
+    .slot.on { background: var(--color); color: #fff; font-weight: 700; }
+    .slot.on .info { color: #fff; }
+    #slot-cartuchera { --color: #f57c00; }
+    #slot-lapiz      { --color: #1e88e5; }
+    #slot-mouse      { --color: #8e24aa; }
+
+    button {
+      font: inherit; font-size: 13px;
+      padding: 6px 10px; cursor: pointer;
+      border: 1.5px solid #111; background: #fff; user-select: none; touch-action: none;
+    }
+    button:active { background: #eee; }
+    .barra-botones { display: flex; gap: 10px; }
+    .barra-botones button { flex: 1; padding: 10px; }
+    #entrenar { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+    #entrenar:disabled { opacity: .5; cursor: default; }
+
+    ul { margin: 0; padding: 0; list-style: none; }
+    li { padding: 6px 0; font-size: 15px; }
+    li.on { font-weight: 700; }
+
+    #audio { margin-top: 40px; }
+    #mic { display: flex; justify-content: center; padding: 14px 0 6px; cursor: pointer; }
+    #mic svg { width: 64px; height: 64px; fill: #555; transition: fill .2s; }
+    #mic.hablando svg { fill: #1e88e5; animation: pulso .7s infinite alternate; }
+    @keyframes pulso { to { transform: scale(1.18); } }
+    #dicho { text-align: center; min-height: 22px; font-weight: 600; }
+    #estado { font-size: 12px; color: #666; margin-top: 8px; line-height: 1.4; }
+    @media (max-width: 760px) { .layout { grid-template-columns: 1fr; gap: 24px; } }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="col">
+      <div class="panel" id="camara">
+        <h2>Cámara</h2>
+        <canvas id="canvas" width="640" height="480"></canvas>
+      </div>
+
+      <div class="slot" id="slot-cartuchera">
+        <span>Cartuchera</span><span class="info">0 ejemplos</span>
+        <button data-label="cartuchera">Mantener para enseñar</button>
+      </div>
+      <div class="slot" id="slot-lapiz">
+        <span>Lápiz</span><span class="info">0 ejemplos</span>
+        <button data-label="lapiz">Mantener para enseñar</button>
+      </div>
+      <div class="slot" id="slot-mouse">
+        <span>Mouse</span><span class="info">0 ejemplos</span>
+        <button data-label="mouse">Mantener para enseñar</button>
+      </div>
+
+      <div class="barra-botones">
+        <button data-label="nada" id="btn-nada">Fondo (sin objeto)</button>
+        <button id="entrenar" disabled>Entrenar</button>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="panel">
+        <ul>
+          <li id="li-cartuchera">Cartuchera</li>
+          <li id="li-lapiz">Lápiz</li>
+          <li id="li-mouse">Mouse</li>
+        </ul>
+      </div>
+      <div class="panel" id="audio">
+        <h2>Audio</h2>
+        <div id="mic" title="Haz clic para activar la voz">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+          </svg>
+        </div>
+        <div id="dicho"></div>
+        <div id="estado">Cargando modelo…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const estado = document.getElementById('estado');
+    const mic = document.getElementById('mic');
+    const dicho = document.getElementById('dicho');
+    const btnEntrenar = document.getElementById('entrenar');
+
+    const NOMBRES = { cartuchera: 'Cartuchera', lapiz: 'Lápiz', mouse: 'Mouse' };
+    const ETIQUETAS = ['cartuchera', 'lapiz', 'mouse', 'nada'];
+    const CONFIANZA_MIN = 0.8;
+    const ESPERA_MS = 3000;
+
+    let video, extractor, classifier;
+    let entrenado = false;
+    let entrenando = false;
+    const conteo = { cartuchera: 0, lapiz: 0, mouse: 0, nada: 0 };
+    let actual = null;
+    let ultimaVez = {};
+
+    // ---------- Voz ----------
+    let vozLista = false;
+    function desbloquearVoz() {
+      if (vozLista || !('speechSynthesis' in window)) return;
+      vozLista = true;
+      speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+    }
+    document.addEventListener('click', desbloquearVoz);
+    document.addEventListener('pointerdown', desbloquearVoz);
+
+    function hablar(texto) {
+      if (!('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(texto);
+      u.lang = 'es-ES';
+      const v = speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
+      if (v) u.voice = v;
+      u.onstart = () => { mic.classList.add('hablando'); dicho.textContent = texto; };
+      u.onend = u.onerror = () => mic.classList.remove('hablando');
+      speechSynthesis.speak(u);
+    }
+
+    // ---------- Enseñar ejemplos ----------
+    function actualizarConteo(label) {
+      if (label === 'nada') {
+        document.getElementById('btn-nada').textContent = `Fondo (${conteo.nada})`;
+        return;
+      }
+      document.querySelector(`#slot-${label} .info`).textContent = `${conteo[label]} ejemplos`;
+    }
+
+    function activarEntrenar() {
+      const ok = ['cartuchera', 'lapiz', 'mouse'].some(l => conteo[l] > 0) && conteo.nada > 0;
+      btnEntrenar.disabled = !ok || entrenando;
+    }
+
+    document.querySelectorAll('button[data-label]').forEach(btn => {
+      const label = btn.dataset.label;
+      let timer = null;
+
+      const agregar = () => {
+        if (!classifier || entrenando) return;
+        classifier.addImage(label);
+        conteo[label]++;
+        actualizarConteo(label);
+        activarEntrenar();
+      };
+      const iniciar = e => {
+        e.preventDefault();
+        agregar();
+        timer = setInterval(agregar, 120);
+      };
+      const parar = () => { clearInterval(timer); timer = null; };
+
+      btn.addEventListener('pointerdown', iniciar);
+      btn.addEventListener('pointerup', parar);
+      btn.addEventListener('pointerleave', parar);
+      btn.addEventListener('pointercancel', parar);
+    });
+
+    // ---------- Entrenar ----------
+    btnEntrenar.addEventListener('click', () => {
+      entrenando = true;
+      btnEntrenar.disabled = true;
+      estado.textContent = 'Entrenando… (puede tardar unos segundos)';
+      classifier.train(loss => {
+        if (loss === null) {
+          entrenando = false;
+          entrenado = true;
+          btnEntrenar.disabled = false;
+          btnEntrenar.textContent = 'Volver a entrenar';
+          estado.textContent = 'Listo. Muestra un objeto a la cámara. Puedes añadir más ejemplos y volver a entrenar.';
+          clasificar();
+        } else {
+          estado.textContent = 'Entrenando… error ' + Number(loss).toFixed(3);
+        }
+      });
+    });
+
+    // ---------- Clasificación ----------
+    function mostrar(label, conf) {
+      for (const obj of Object.keys(NOMBRES)) {
+        const on = obj === label;
+        const slot = document.getElementById('slot-' + obj);
+        slot.classList.toggle('on', on);
+        slot.querySelector('.info').textContent = on
+          ? Math.round(conf * 100) + '%'
+          : `${conteo[obj]} ejemplos`;
+        document.getElementById('li-' + obj).classList.toggle('on', on);
+      }
+    }
+
+    let clasificando = false;
+    function clasificar() {
+      if (clasificando) return;
+      clasificando = true;
+      const ciclo = () => {
+        classifier.classify((err, results) => {
+          if (!err && results && results.length && !entrenando) {
+            const r = results[0];
+            const label = r.confidence >= CONFIANZA_MIN && r.label !== 'nada' ? r.label : null;
+            mostrar(label, r.confidence);
+            const ahora = Date.now();
+            if (label && label !== actual && ahora - (ultimaVez[label] || 0) > ESPERA_MS) {
+              ultimaVez[label] = ahora;
+              hablar(NOMBRES[label]);
+            }
+            actual = label;
+          }
+          ciclo();
+        });
+      };
+      ciclo();
+    }
+
+    function dibujar() {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      requestAnimationFrame(dibujar);
+    }
+
+    async function iniciar() {
+      try {
+        video = document.createElement('video');
+        video.playsInline = true;
+        video.muted = true;
+        video.srcObject = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 }
+        });
+        await video.play();
+        requestAnimationFrame(dibujar);
+
+        extractor = ml5.featureExtractor('MobileNet', { numLabels: ETIQUETAS.length }, () => {
+          classifier = extractor.classification(video, () => {
+            estado.textContent =
+              '1) Pon un objeto frente a la cámara y mantén pulsado su botón unos segundos (mueve el objeto un poco). ' +
+              '2) Repite con los demás. 3) Pulsa "Fondo" sin ningún objeto. 4) Pulsa "Entrenar".';
+          });
+        });
+      } catch (err) {
+        console.error(err);
+        estado.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

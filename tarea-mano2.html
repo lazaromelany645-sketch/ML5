@@ -1,14 +1,67 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Detección de manos con ML5</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://unpkg.com/ml5@1.2.1/dist/ml5.min.js"></script>
 </head>
 <body>
-  <!-- 
-  Diseñe una aplicación utilizando ML5, que trace una línea entre sus dedos índice
-  y se renderice en tiempo real siempre que detecte ambas manos
-  -->
+
+  <h2>Línea entre dedos índices con ML5</h2>
+
+  <script>
+    let video;
+    let detector;
+    let manos = [];
+
+    function setup() {
+      createCanvas(640, 480);
+
+      video = createCapture(VIDEO);
+      video.size(640, 480);
+      video.hide();
+
+      detector = ml5.handPose({ maxHands: 2 }, () => {
+        detector.detectStart(video, resultados => {
+          manos = resultados;
+        });
+      });
+    }
+
+    function draw() {
+      background(220);
+
+      push();
+      translate(width, 0);
+      scale(-1, 1);
+      image(video, 0, 0, width, height);
+      pop();
+
+      if (manos.length >= 2) {
+        let dedo1 = manos[0].keypoints[8];
+        let dedo2 = manos[1].keypoints[8];
+
+        let x1 = width - dedo1.x;
+        let y1 = dedo1.y;
+
+        let x2 = width - dedo2.x;
+        let y2 = dedo2.y;
+
+        stroke(255, 0, 0);
+        strokeWeight(5);
+        line(x1, y1, x2, y2);
+
+        fill(0, 255, 0);
+        noStroke();
+        circle(x1, y1, 15);
+        circle(x2, y2, 15);
+      }
+    }
+  </script>
+
 </body>
 </html>

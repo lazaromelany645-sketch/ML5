@@ -1,15 +1,83 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Círculo con ML5</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
 </head>
 <body>
-  <!-- 
-  Diseñe una aplicación en ML5 que dibuje un círculo entre su dedo
-  índice y el pulgar, este tendrá diferentes colores en función de
-  la distancia entre ambos. Utilizar 3 colores
-  -->
+
+  <h2>Círculo de colores con ML5</h2>
+
+  <script>
+    let video;
+    let detector;
+    let manos = [];
+
+    function setup() {
+      createCanvas(640, 480);
+
+      video = createCapture(VIDEO);
+      video.size(640, 480);
+      video.hide();
+
+      detector = ml5.handpose(video, () => {
+        console.log("Modelo cargado");
+
+      });
+
+      detector.on("predict", resultados => {
+        manos = resultados;
+      });
+    }
+
+    function draw() {
+      background(220);
+
+      push();
+      translate(width, 0);
+      scale(-1, 1);
+      image(video, 0, 0, width, height);
+      pop();
+
+      if (manos.length > 0) {
+        let puntos = manos[0].landmarks;
+
+        let pulgar = puntos[4];
+        let indice = puntos[8];
+
+        let distancia = dist(
+          pulgar[0], pulgar[1],
+          indice[0], indice[1]
+        );
+
+        let x = width - (pulgar[0] + indice[0]) / 2;
+        let y = (pulgar[1] + indice[1]) / 2;
+
+        let colorCirculo;
+
+        if (distancia < 50) {
+          colorCirculo = "red";
+        } else if (distancia < 120) {
+          colorCirculo = "yellow";
+        } else {
+          colorCirculo = "lime";
+        }
+
+        fill(colorCirculo);
+        noStroke();
+        circle(x, y, 40);
+
+        fill(255);
+        textSize(18);
+        text("Distancia: " + distancia.toFixed(0), 20, 30);
+      }
+    }
+  </script>
+
 </body>
 </html>
